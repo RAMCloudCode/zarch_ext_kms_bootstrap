@@ -65,7 +65,7 @@ class Extension(ZArchExtension):
     def claim(self, extension_name: str, extension_block: Dict[str, Any]) -> bool:
         return extension_block.get("type") == "kms-bootstrap"
 
-    def post_project_bootstrap(
+    async def post_project_bootstrap(
         self,
         project_context,
         extension_configuration: Dict[str, Any],
@@ -83,7 +83,7 @@ class Extension(ZArchExtension):
                 )
             else:
                 project_context.log("kms-bootstrap: enabling Cloud KMS API.")
-                self._run_gcloud(
+                await self._run_gcloud(
                     project_context,
                     ["services", "enable", "cloudkms.googleapis.com", "--quiet"],
                     "enable Cloud KMS API",
@@ -94,13 +94,13 @@ class Extension(ZArchExtension):
             "kms-bootstrap: ensuring key ring "
             f"'{settings['key_ring']}' in location '{settings['location']}'."
         )
-        self._ensure_key_ring(project_context, settings)
+        await self._ensure_key_ring(project_context, settings)
 
         project_context.log(
             "kms-bootstrap: ensuring crypto key "
             f"'{settings['key_id']}' in key ring '{settings['key_ring']}'."
         )
-        self._ensure_crypto_key(project_context, settings)
+        await self._ensure_crypto_key(project_context, settings)
 
     def _resolve_settings(
         self,
@@ -202,7 +202,7 @@ class Extension(ZArchExtension):
 
         return merged
 
-    def _ensure_key_ring(
+    async def _ensure_key_ring(
         self,
         project_context,
         settings: Mapping[str, Any],
@@ -210,7 +210,7 @@ class Extension(ZArchExtension):
         key_ring = str(settings["key_ring"])
         location = str(settings["location"])
 
-        describe_output, describe_code = self._gcloud_with_project(
+        describe_output, describe_code = await self._gcloud_with_project(
             project_context,
             [
                 "kms",
@@ -241,7 +241,7 @@ class Extension(ZArchExtension):
                 f"in location '{location}'."
             )
 
-        self._run_gcloud(
+        await self._run_gcloud(
             project_context,
             [
                 "kms",
@@ -255,7 +255,7 @@ class Extension(ZArchExtension):
             settings=settings,
         )
 
-        describe_after = self._run_gcloud(
+        describe_after = await self._run_gcloud(
             project_context,
             [
                 "kms",
@@ -277,7 +277,7 @@ class Extension(ZArchExtension):
         self._validate_key_ring_shape(key_ring_obj, settings)
         return dict(key_ring_obj)
 
-    def _ensure_crypto_key(
+    async def _ensure_crypto_key(
         self,
         project_context,
         settings: Mapping[str, Any],
@@ -286,7 +286,7 @@ class Extension(ZArchExtension):
         key_ring = str(settings["key_ring"])
         location = str(settings["location"])
 
-        describe_output, describe_code = self._gcloud_with_project(
+        describe_output, describe_code = await self._gcloud_with_project(
             project_context,
             [
                 "kms",
@@ -307,7 +307,7 @@ class Extension(ZArchExtension):
                     f"got {type(key_obj).__name__}."
                 )
             self._validate_crypto_key_shape(key_obj, settings)
-            self._reconcile_rotation(project_context, key_obj, settings)
+            await self._reconcile_rotation(project_context, key_obj, settings)
             return dict(key_obj)
 
         if not self._is_not_found_error(describe_output):
@@ -339,14 +339,14 @@ class Extension(ZArchExtension):
                 ]
             )
 
-        self._run_gcloud(
+        await self._run_gcloud(
             project_context,
             create_args,
             f"create crypto key '{key_id}'",
             settings=settings,
         )
 
-        describe_after = self._run_gcloud(
+        describe_after = await self._run_gcloud(
             project_context,
             [
                 "kms",
@@ -367,7 +367,7 @@ class Extension(ZArchExtension):
                 f"got {type(key_obj).__name__}."
             )
         self._validate_crypto_key_shape(key_obj, settings)
-        self._reconcile_rotation(project_context, key_obj, settings)
+        await self._reconcile_rotation(project_context, key_obj, settings)
         return dict(key_obj)
 
     def _validate_key_ring_shape(
@@ -423,7 +423,7 @@ class Extension(ZArchExtension):
                 + "; ".join(mismatches)
             )
 
-    def _reconcile_rotation(
+    async def _reconcile_rotation(
         self,
         project_context,
         key_obj: Mapping[str, Any],
@@ -443,7 +443,7 @@ class Extension(ZArchExtension):
                 f"actual={current_rotation!r})."
             )
 
-        self._run_gcloud(
+        await self._run_gcloud(
             project_context,
             [
                 "kms",
@@ -480,7 +480,7 @@ class Extension(ZArchExtension):
         next_rotation = datetime.now(timezone.utc) + timedelta(days=rotation_period_days)
         return next_rotation.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
-    def _run_gcloud(
+    async def _run_gcloud(
         self,
         project_context,
         args: list[str],
@@ -494,7 +494,7 @@ class Extension(ZArchExtension):
 
         attempt = 1
         while True:
-            output, code = self._gcloud_with_project(project_context, args)
+            output, code = await self._gcloud_with_project(project_context, args)
             if code == 0:
                 return output
 
@@ -513,11 +513,11 @@ class Extension(ZArchExtension):
                 delay_seconds *= backoff_multiplier
             attempt += 1
 
-    def _gcloud_with_project(self, project_context, args: list[str]) -> tuple[str, int]:
+    async def _gcloud_with_project(self, project_context, args: list[str]) -> tuple[str, int]:
         full_args = list(args)
         if not any(arg == "--project" or arg.startswith("--project=") for arg in full_args):
             full_args.extend(["--project", project_context.id])
-        return project_context.gcloud(full_args)
+        return await project_context.gcloud(full_args)
 
     def _parse_json(self, output: str, source: str) -> Any:
         try:

@@ -32,7 +32,7 @@ extensions:
 ```
 
 ## Hooks
-- `post_project_bootstrap`
+- `async post_project_bootstrap`
 
 ## Config Reference
 | Key | Type | Default | Notes |

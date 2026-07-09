@@ -1,3 +1,4 @@
+import asyncio
 import sys
 from pathlib import Path
 
@@ -16,7 +17,7 @@ class DummyContext:
         self.gcloud_calls = []
         self.logs = []
 
-    def gcloud(self, args):
+    async def gcloud(self, args):
         self.gcloud_calls.append(list(args))
         return self._responder(args)
 
@@ -147,7 +148,7 @@ def test_create_command_shape_when_resources_missing():
         return ("{}", 0)
 
     ctx = DummyContext(responder=responder)
-    ext.post_project_bootstrap(
+    asyncio.run(ext.post_project_bootstrap(
         ctx,
         {
             "config": {
@@ -157,7 +158,7 @@ def test_create_command_shape_when_resources_missing():
                 "rotation_period_days": 90,
             }
         },
-    )
+    ))
 
     enable_calls = [c for c in calls if c[:2] == ["services", "enable"]]
     ring_create_calls = [c for c in calls if c[:3] == ["kms", "keyrings", "create"]]
@@ -205,7 +206,7 @@ def test_idempotency_skips_create_and_update_for_compliant_resources():
         return ("{}", 0)
 
     ctx = DummyContext(responder=responder)
-    ext.post_project_bootstrap(
+    asyncio.run(ext.post_project_bootstrap(
         ctx,
         {
             "config": {
@@ -216,7 +217,7 @@ def test_idempotency_skips_create_and_update_for_compliant_resources():
                 "enable_api": False,
             }
         },
-    )
+    ))
 
     assert [c for c in calls if c[:3] == ["kms", "keyrings", "create"]] == []
     assert [c for c in calls if c[:3] == ["kms", "keys", "create"]] == []
@@ -247,7 +248,7 @@ def test_idempotency_accepts_describe_purpose_encryption_alias():
         return ("{}", 0)
 
     ctx = DummyContext(responder=responder)
-    ext.post_project_bootstrap(
+    asyncio.run(ext.post_project_bootstrap(
         ctx,
         {
             "config": {
@@ -258,7 +259,7 @@ def test_idempotency_accepts_describe_purpose_encryption_alias():
                 "enable_api": False,
             }
         },
-    )
+    ))
 
     assert [c for c in calls if c[:3] == ["kms", "keys", "update"]] == []
     assert [c for c in calls if c[:3] == ["kms", "keys", "create"]] == []
@@ -287,7 +288,7 @@ def test_rotation_drift_updates_key_with_expected_flags():
         return ("{}", 0)
 
     ctx = DummyContext(responder=responder)
-    ext.post_project_bootstrap(
+    asyncio.run(ext.post_project_bootstrap(
         ctx,
         {
             "config": {
@@ -298,7 +299,7 @@ def test_rotation_drift_updates_key_with_expected_flags():
                 "enable_api": False,
             }
         },
-    )
+    ))
 
     update_calls = [c for c in calls if c[:3] == ["kms", "keys", "update"]]
     assert len(update_calls) == 1
@@ -335,7 +336,7 @@ def test_fail_closed_on_incompatible_existing_key_shape():
 
     ctx = DummyContext(responder=responder)
     with pytest.raises(RuntimeError, match="incompatible"):
-        ext.post_project_bootstrap(
+        asyncio.run(ext.post_project_bootstrap(
             ctx,
             {
                 "config": {
@@ -346,7 +347,7 @@ def test_fail_closed_on_incompatible_existing_key_shape():
                     "enable_api": False,
                 }
             },
-        )
+        ))
 
     assert [c for c in calls if c[:3] == ["kms", "keys", "update"]] == []
     assert [c for c in calls if c[:3] == ["kms", "keys", "create"]] == []
@@ -364,7 +365,7 @@ def test_preflight_mode_fails_without_mutating_when_keyring_missing():
 
     ctx = DummyContext(responder=responder)
     with pytest.raises(RuntimeError, match="Preflight failed: key ring"):
-        ext.post_project_bootstrap(
+        asyncio.run(ext.post_project_bootstrap(
             ctx,
             {
                 "config": {
@@ -375,7 +376,7 @@ def test_preflight_mode_fails_without_mutating_when_keyring_missing():
                     "enable_api": True,
                 }
             },
-        )
+        ))
 
     assert [c for c in calls if c[:2] == ["services", "enable"]] == []
     assert [c for c in calls if c[:3] == ["kms", "keyrings", "create"]] == []
@@ -411,7 +412,7 @@ def test_transient_error_retries_then_succeeds():
         return ("{}", 0)
 
     ctx = DummyContext(responder=responder)
-    ext.post_project_bootstrap(
+    asyncio.run(ext.post_project_bootstrap(
         ctx,
         {
             "config": {
@@ -423,7 +424,7 @@ def test_transient_error_retries_then_succeeds():
                 "retry_backoff_multiplier": 2,
             }
         },
-    )
+    ))
 
     enable_calls = [c for c in calls if c[:2] == ["services", "enable"]]
     assert len(enable_calls) == 3
