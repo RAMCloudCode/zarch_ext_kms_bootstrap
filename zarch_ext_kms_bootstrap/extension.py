@@ -62,9 +62,6 @@ class Extension(ZArchExtension):
     Z-Arch extension: kms-bootstrap
     """
 
-    def claim(self, extension_name: str, extension_block: Dict[str, Any]) -> bool:
-        return extension_block.get("type") == "kms-bootstrap"
-
     async def post_project_bootstrap(
         self,
         project_context,

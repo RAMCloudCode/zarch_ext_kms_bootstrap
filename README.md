@@ -14,7 +14,7 @@
 ```yaml
 extensions:
   kms-bootstrap:
-    type: "kms-bootstrap"
+    extension: "kms-bootstrap"
     required_roles:
       - "roles/cloudkms.admin"
       - "roles/serviceusage.serviceUsageAdmin"
